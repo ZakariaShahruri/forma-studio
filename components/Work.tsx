@@ -142,7 +142,10 @@ export function Work() {
             </div>
 
             {/* Full-bleed media */}
-            <div className="project-media relative aspect-[16/10] w-full overflow-hidden bg-[color-mix(in_srgb,var(--color-concrete)_22%,var(--color-white))] md:aspect-[16/8]">
+            <div
+              data-cursor="glass"
+              className="project-media relative aspect-[16/10] w-full overflow-hidden bg-[color-mix(in_srgb,var(--color-concrete)_22%,var(--color-white))] md:aspect-[16/8]"
+            >
               <video
                 className="h-full w-full object-cover"
                 src={p.video}

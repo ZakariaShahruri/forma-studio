@@ -60,6 +60,7 @@ export function Approach() {
           <button
             type="button"
             onClick={() => setView("index")}
+            data-cursor="cta"
             className={`label transition-opacity duration-300 ${
               view === "index" ? "text-charcoal" : "text-concrete hover:opacity-70"
             }`}
@@ -70,6 +71,7 @@ export function Approach() {
           <button
             type="button"
             onClick={() => setView("grid")}
+            data-cursor="cta"
             className={`label transition-opacity duration-300 ${
               view === "grid" ? "text-charcoal" : "text-concrete hover:opacity-70"
             }`}

@@ -31,6 +31,7 @@ export function Navbar() {
   return (
     <>
       <header
+        data-cursor="glass"
         className={`fixed inset-x-0 top-0 z-50 transition-[background-color,backdrop-filter,border-color] duration-500 ${
           scrolled
             ? "border-b border-[color-mix(in_srgb,var(--color-concrete)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-white)_72%,transparent)] backdrop-blur-md"
@@ -41,6 +42,7 @@ export function Navbar() {
           {/* Studio mark — small caps, no icon */}
           <a
             href="#top"
+            data-cursor="cta"
             className="label text-charcoal transition-opacity duration-300 hover:opacity-60"
             aria-label="FORMA STUDIO — home"
           >
@@ -53,6 +55,7 @@ export function Navbar() {
               <li key={link.href}>
                 <a
                   href={link.href}
+                  data-cursor="cta"
                   className="label text-charcoal transition-opacity duration-300 hover:opacity-50"
                 >
                   {link.label}
@@ -65,6 +68,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setOpen(true)}
+            data-cursor="cta"
             className="label text-charcoal md:hidden"
             aria-expanded={open}
             aria-controls="mobile-menu"
@@ -103,6 +107,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setOpen(false)}
+              data-cursor="cta"
               className="label text-charcoal"
             >
               Close
@@ -115,6 +120,7 @@ export function Navbar() {
                 <a
                   href={link.href}
                   onClick={() => setOpen(false)}
+                  data-cursor="cta"
                   className="display block text-[15vw] leading-[1.05] text-charcoal transition-opacity duration-300 hover:opacity-50"
                 >
                   {link.label}

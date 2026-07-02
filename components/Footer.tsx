@@ -33,6 +33,7 @@ export function Footer() {
       {/* Monumental call to work together */}
       <a
         href="mailto:studio@formastudio.example"
+        data-cursor="cta"
         className="contact-word display text-hero block uppercase transition-opacity duration-500 hover:opacity-60"
         aria-label="Email FORMA STUDIO"
       >
@@ -50,6 +51,7 @@ export function Footer() {
           <span className="mb-2 block text-white">General</span>
           <a
             href="mailto:studio@formastudio.example"
+            data-cursor="cta"
             className="[text-transform:none] hover:text-white"
           >
             studio@formastudio.example
@@ -59,6 +61,7 @@ export function Footer() {
           <span className="mb-2 block text-white">New Work</span>
           <a
             href="mailto:new@formastudio.example"
+            data-cursor="cta"
             className="[text-transform:none] hover:text-white"
           >
             new@formastudio.example

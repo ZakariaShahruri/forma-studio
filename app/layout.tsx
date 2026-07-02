@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { editorial, montreal } from "./fonts";
 import { Navbar } from "@/components/Navbar";
+import { Cursor } from "@/components/Cursor";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${editorial.variable} ${montreal.variable}`}>
       <body>
+        <Cursor />
         <Navbar />
         {children}
       </body>

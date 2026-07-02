@@ -89,6 +89,13 @@ body {
   border-top: 1px solid color-mix(in srgb, var(--color-concrete) 45%, transparent);
 }
 
+/* Custom cursor — hide the native one once the instrument takes over.
+   Only applied for fine pointers (class is set from JS). */
+.has-custom-cursor,
+.has-custom-cursor * {
+  cursor: none !important;
+}
+
 /* Respect reduced motion — no exceptions */
 @media (prefers-reduced-motion: reduce) {
   html {
