@@ -16,6 +16,12 @@ that behaves like a precision instrument.
 
 ## The scroll experience
 
+On first load a **preloader** holds the screen: the exterior still
+(`public/images/preloader.jpg`) the walkthrough opens on, the studio name,
+and a thin rule that fills with real video buffering progress. Scroll is
+locked until enough of the video's head has buffered, then the preloader
+fades onto the identical first frame.
+
 `components/Experience.tsx` pins the viewport for **600vh** of scroll.
 Scroll position maps to a progress value in `[0, 1]` that drives everything:
 
@@ -73,6 +79,7 @@ components/
   Navbar.tsx      # transparent → frosted on scroll; scrolls to track positions
   Cursor.tsx      # custom cursor (see below)
 public/videos/    # walkthrough.mp4 — the scroll-driven house walkthrough
+public/images/    # preloader.jpg — exterior still shown while buffering
 ```
 
 ## Custom cursor

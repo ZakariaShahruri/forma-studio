@@ -53,7 +53,13 @@ export function Footer() {
       ref={root}
       className="gutter grid h-20 grid-cols-3 items-center border-t border-white/10 bg-charcoal text-white"
     >
-      <span className="label text-left text-white">Forma Studio</span>
+      <div className="flex flex-col justify-center gap-1">
+        <span className="label text-white">Forma Studio</span>
+        {/* The architect's signature on the drawing */}
+        <span className="font-ui text-[11px] text-concrete transition-colors duration-300 hover:text-white/75">
+          Built by Zakaria Shahruri
+        </span>
+      </div>
 
       <span className="label text-center text-concrete">
         Copenhagen — Est. 1998

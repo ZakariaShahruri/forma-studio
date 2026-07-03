@@ -52,6 +52,7 @@ export function Experience() {
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let removeVideoListeners = () => {};
+    let removePreloader = () => {};
 
     const ctx = gsap.context(() => {
       const panels = gsap.utils.toArray<HTMLElement>(".panel");
@@ -247,9 +248,96 @@ export function Experience() {
       });
 
       update(st.progress);
+
+      /* ---- Preloader -------------------------------------------------
+         A full-viewport still of the house exterior (the same view the
+         video opens on) holds the screen while the walkthrough buffers.
+         Scroll is locked so the experience always begins from frame 0;
+         the fade-out lands on the identical first frame — no cut. */
+      const preloader = section.querySelector<HTMLElement>(".preloader");
+      const preContent = section.querySelector<HTMLElement>(".preloader-content");
+      const preFill = section.querySelector<HTMLElement>(".preloader-fill");
+
+      if (preloader && preContent && preFill) {
+        document.body.style.overflow = "hidden";
+        const t0 = performance.now();
+
+        gsap.to(preContent, {
+          opacity: 1,
+          duration: reduce ? 0.2 : 1,
+          delay: 0.15,
+          ease: "power2.out",
+        });
+
+        /* Enough of the head of the video to scrub the opening without
+           stalling — the rest keeps buffering behind the experience. */
+        const READY_SECONDS = 5;
+        let preDone = false;
+
+        const bufferedFromStart = () => {
+          try {
+            for (let i = 0; i < video.buffered.length; i++) {
+              if (video.buffered.start(i) <= 0.1) return video.buffered.end(i);
+            }
+          } catch {
+            /* buffered ranges can throw mid-load */
+          }
+          return 0;
+        };
+
+        const finish = () => {
+          if (preDone) return;
+          preDone = true;
+          window.clearInterval(prePoll);
+          window.clearTimeout(preFailsafe);
+          gsap.to(preFill, { scaleX: 1, duration: 0.25, ease: "power1.out" });
+          // Hold briefly so a fast load still reads as a deliberate opening.
+          const elapsed = performance.now() - t0;
+          gsap.to(preloader, {
+            autoAlpha: 0,
+            duration: reduce ? 0.2 : 1.1,
+            delay: Math.max(0.3, (1100 - elapsed) / 1000),
+            ease: "power2.inOut",
+            onComplete: () => {
+              document.body.style.overflow = "";
+            },
+          });
+        };
+
+        const onBuffer = () => {
+          if (preDone) return;
+          const p = Math.min(bufferedFromStart() / READY_SECONDS, 1);
+          gsap.to(preFill, {
+            scaleX: p,
+            duration: 0.3,
+            ease: "power1.out",
+            overwrite: "auto",
+          });
+          if (p >= 1 && video.readyState >= 3) finish();
+        };
+
+        video.addEventListener("progress", onBuffer);
+        video.addEventListener("canplaythrough", onBuffer);
+        video.addEventListener("loadeddata", onBuffer);
+        // Some engines fire `progress` sparsely — poll as a backstop.
+        const prePoll = window.setInterval(onBuffer, 250);
+        // Never trap the visitor behind a stalled network.
+        const preFailsafe = window.setTimeout(finish, 10000);
+        onBuffer();
+
+        removePreloader = () => {
+          window.clearInterval(prePoll);
+          window.clearTimeout(preFailsafe);
+          video.removeEventListener("progress", onBuffer);
+          video.removeEventListener("canplaythrough", onBuffer);
+          video.removeEventListener("loadeddata", onBuffer);
+          document.body.style.overflow = "";
+        };
+      }
     }, root);
 
     return () => {
+      removePreloader();
       removeVideoListeners();
       ctx.revert();
     };
@@ -417,6 +505,28 @@ export function Experience() {
       {/* Scroll hint — pulses at the start, gone once the user moves */}
       <div className="scroll-hint pulse-soft label pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 text-white">
         Scroll to Explore ↓
+      </div>
+
+      {/* Preloader — the exterior still the walkthrough opens on. Fades
+          out onto the identical first video frame once enough of the
+          walkthrough has buffered. */}
+      <div className="preloader absolute inset-0 z-40 bg-charcoal">
+        <img
+          src="/images/preloader.jpg"
+          alt=""
+          fetchPriority="high"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="preloader-content absolute inset-0 flex flex-col items-center justify-center gap-10 opacity-0 [text-shadow:0_1px_3px_rgba(0,0,0,0.45),0_2px_16px_rgba(0,0,0,0.3)]">
+          <span className="display text-hero text-center uppercase leading-[0.95]">
+            <span className="block">Forma</span>
+            <span className="block">Studio</span>
+          </span>
+          {/* Buffering progress — a thin rule that fills as the video loads */}
+          <span className="block h-px w-44 bg-white/25">
+            <span className="preloader-fill block h-full w-full origin-left scale-x-0 bg-white" />
+          </span>
+        </div>
       </div>
     </main>
   );
