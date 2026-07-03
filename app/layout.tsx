@@ -4,8 +4,9 @@ import { Navbar } from "@/components/Navbar";
 import { Cursor } from "@/components/Cursor";
 import "./globals.css";
 
+/* Override with NEXT_PUBLIC_SITE_URL when the studio gets its own domain. */
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://forma-studio.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://forma-studio-ivory.vercel.app";
 
 export const metadata: Metadata = {
   title: "FORMA STUDIO — Architecture & Interior Design",
