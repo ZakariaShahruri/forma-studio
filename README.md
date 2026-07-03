@@ -1,5 +1,8 @@
 # FORMA STUDIO
 
+**Live: [forma-studio-ivory.vercel.app](https://forma-studio-ivory.vercel.app)**
+— deployed on Vercel; pushes to `main` deploy automatically.
+
 Portfolio site for a boutique architecture and interior design studio.
 The entire site is a single full-viewport experience: a house walkthrough
 video driven frame-by-frame by scroll, with glassmorphism panels surfacing
