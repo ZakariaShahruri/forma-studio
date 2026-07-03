@@ -3,171 +3,201 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "@/lib/gsap";
 
-type State = "default" | "glass" | "cta";
+type State = "default" | "cta" | "text" | "glass";
+
+/* Crosshair geometry — a drafting instrument's sight. Four hairline arms
+   meeting at the pointer with a hollow centre. */
+const ARM = 10; // arm length
+const GAP = 4; // half-gap around the exact centre
+const GLASS_GAP = 15; // spread when measuring a glass surface
+const LINE = 1.5; // line weight — visible without losing precision
+
+/* Elements whose hover means "reading": the crosshair becomes an I-beam. */
+const TEXT_SELECTOR =
+  "p, h1, h2, h3, h4, h5, h6, li, dt, dd, blockquote, figcaption, label, input, textarea, span";
 
 export function Cursor() {
-  const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
-  const arrowRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    const arrow = arrowRef.current;
-    if (!dot || !ring || !arrow) return;
+    const rootEl = rootRef.current;
+    if (!rootEl) return;
 
     // Only for precise pointers — never hijack touch.
-    const finePointer = window.matchMedia("(pointer: fine)");
-    if (!finePointer.matches) return;
-
+    if (!window.matchMedia("(pointer: fine)").matches) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // Hide the native cursor site-wide once we take over.
     document.documentElement.classList.add("has-custom-cursor");
 
-    // Centre every layer on the pointer coordinate.
-    gsap.set([dot, ring, arrow], { xPercent: -50, yPercent: -50 });
-    gsap.set(arrow, { scale: 0.4, opacity: 0 });
+    const cross = rootEl.querySelector<HTMLElement>(".cur-cross")!;
+    const [armUp, armRight, armDown, armLeft] = Array.from(
+      rootEl.querySelectorAll<HTMLElement>(".cur-arm")
+    );
+    const ibeam = rootEl.querySelector<HTMLElement>(".cur-ibeam")!;
+    const [capTop, bar, capBottom] = Array.from(
+      ibeam.querySelectorAll<HTMLElement>("div")
+    );
 
-    // Ring trails with an elastic settle; the dot + arrow track exactly.
-    const ringX = gsap.quickTo(ring, "x", {
-      duration: reduce ? 0.15 : 0.7,
-      ease: reduce ? "power3" : "elastic.out(1, 0.75)",
-    });
-    const ringY = gsap.quickTo(ring, "y", {
-      duration: reduce ? 0.15 : 0.7,
-      ease: reduce ? "power3" : "elastic.out(1, 0.75)",
-    });
+    /* Lay the arms out around the hollow centre — a fine instrument,
+       weighted just enough to be found instantly on any frame. */
+    gsap.set(armUp, { width: LINE, height: ARM, x: -LINE / 2, y: -(GAP + ARM) });
+    gsap.set(armDown, { width: LINE, height: ARM, x: -LINE / 2, y: GAP });
+    gsap.set(armLeft, { height: LINE, width: ARM, y: -LINE / 2, x: -(GAP + ARM) });
+    gsap.set(armRight, { height: LINE, width: ARM, y: -LINE / 2, x: GAP });
+    gsap.set(ibeam, { opacity: 0 });
 
+    /* Immediate tracking — no tween, no lag. Precision tools don't drift. */
+    const setX = gsap.quickSetter(rootEl, "x", "px");
+    const setY = gsap.quickSetter(rootEl, "y", "px");
+
+    let lastX = -100;
+    let lastY = -100;
     let visible = false;
-    const reveal = () => {
-      if (visible) return;
-      visible = true;
-      gsap.to([dot, ring], { opacity: 1, duration: 0.35, ease: "power2.out" });
+
+    /* Size the I-beam from the hovered text so it reads as that type's own
+       caret: bar height follows font-size, bar weight follows font-weight. */
+    const fitIbeam = (el: Element) => {
+      const cs = getComputedStyle(el);
+      const size = parseFloat(cs.fontSize) || 16;
+      const weight = parseInt(cs.fontWeight, 10) || 400;
+      const h = Math.min(Math.max(size * 1.15, 14), 96);
+      const w = weight >= 500 ? 2.5 : weight >= 400 ? 2 : 1.5;
+      gsap.set(bar, { width: w, height: h, x: -w / 2, y: -h / 2 });
+      gsap.set(capTop, { width: 8, height: 1.5, x: -4, y: -h / 2 });
+      gsap.set(capBottom, { width: 8, height: 1.5, x: -4, y: h / 2 - 1.5 });
+    };
+
+    // ---- State machine -------------------------------------------------
+    let state: State = "default";
+    let textEl: Element | null = null;
+
+    const spreadArms = (gap: number, duration: number, ease: string) => {
+      gsap.to(armUp, { y: -(gap + ARM), duration, ease, overwrite: "auto" });
+      gsap.to(armDown, { y: gap, duration, ease, overwrite: "auto" });
+      gsap.to(armLeft, { x: -(gap + ARM), duration, ease, overwrite: "auto" });
+      gsap.to(armRight, { x: gap, duration, ease, overwrite: "auto" });
+    };
+
+    const apply = (next: State, el: Element | null = null) => {
+      if (next === state && el === textEl) return;
+
+      if (next === "text" && el) fitIbeam(el);
+      state = next;
+      textEl = next === "text" ? el : null;
+
+      const fast = reduce ? 0 : 0.22;
+
+      // Crosshair ⇄ I-beam crossfade.
+      gsap.to(cross, {
+        opacity: next === "text" ? 0 : 1,
+        duration: fast,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(ibeam, {
+        opacity: next === "text" ? 1 : 0,
+        duration: fast,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+
+      // Interactive: rotate 45° and contract — the sight locks on.
+      gsap.to(cross, {
+        rotation: next === "cta" ? 45 : 0,
+        scale: next === "cta" ? 0.78 : 1,
+        duration: reduce ? 0 : 0.3,
+        ease: "power3.out",
+        overwrite: "auto",
+      });
+
+      // Glass: the arms travel outward slowly, as if measuring the space.
+      if (next === "glass") {
+        spreadArms(GLASS_GAP, reduce ? 0 : 1.4, "power1.out");
+      } else {
+        spreadArms(GAP, reduce ? 0 : 0.45, "power3.out");
+      }
+    };
+
+    const resolve = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return apply("default");
+      const cta = target.closest('[data-cursor="cta"], a, button');
+      if (cta) return apply("cta");
+      const text = target.closest(TEXT_SELECTOR);
+      if (text && (text.textContent ?? "").trim().length > 0)
+        return apply("text", text);
+      if (target.closest('[data-cursor="glass"]')) return apply("glass");
+      apply("default");
     };
 
     const onMove = (e: PointerEvent) => {
-      reveal();
-      // Exact tracking — the instrument tip.
-      gsap.set([dot, arrow], { x: e.clientX, y: e.clientY });
-      ringX(e.clientX);
-      ringY(e.clientY);
+      lastX = e.clientX;
+      lastY = e.clientY;
+      setX(lastX);
+      setY(lastY);
+      if (!visible) {
+        visible = true;
+        gsap.to(rootEl, { opacity: 1, duration: 0.25, ease: "power2.out" });
+      }
+      resolve(e.target);
     };
 
-    // ---- Interaction states -------------------------------------------
-    // Resting scale of each layer per state; press scales these down a touch.
-    const REST: Record<State, { dot: number; ring: number; arrow: number }> = {
-      default: { dot: 1, ring: 1, arrow: 0.4 },
-      glass: { dot: 0.65, ring: 2.7, arrow: 0.4 },
-      cta: { dot: 0, ring: 0, arrow: 1 },
-    };
+    const onOver = (e: PointerEvent) => resolve(e.target);
 
-    let state: State = "default";
-    let pressed = false;
-
-    const render = (next: State) => {
-      const press = pressed ? 0.85 : 1;
-      const r = REST[next];
-
-      gsap.to(dot, {
-        scale: r.dot * press,
-        opacity: next === "cta" ? 0 : 1,
-        duration: 0.3,
-        ease: "power3.out",
-      });
-      gsap.to(ring, {
-        scale: r.ring * press,
-        opacity: next === "cta" ? 0 : 1,
-        duration: next === "glass" ? 0.45 : 0.4,
-        ease: "power3.out",
-      });
-      gsap.to(arrow, {
-        scale: r.arrow * press,
-        opacity: next === "cta" ? 1 : 0,
-        duration: next === "cta" ? 0.4 : 0.2,
-        ease: next === "cta" ? "back.out(2.2)" : "power3.out",
+    /* Panels fade in and out beneath a stationary pointer while scrolling —
+       re-read what is actually under the crosshair. */
+    let scrollRaf = 0;
+    const onScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        if (visible) resolve(document.elementFromPoint(lastX, lastY));
       });
     };
 
-    const apply = (next: State) => {
-      if (next === state) return;
-      state = next;
-      render(state);
-    };
-
-    const resolve = (target: EventTarget | null): State => {
-      if (!(target instanceof Element)) return "default";
-      // CTA wins when nested inside a glass surface (it's the inner intent).
-      if (target.closest('[data-cursor="cta"]')) return "cta";
-      if (target.closest('[data-cursor="glass"]')) return "glass";
-      return "default";
-    };
-
-    const onOver = (e: PointerEvent) => apply(resolve(e.target));
-
-    // Tactile press feedback — re-render the current state at pressed scale.
-    const onDown = () => {
-      pressed = true;
-      render(state);
-    };
-    const onUp = () => {
-      pressed = false;
-      render(state);
-    };
-
-    const onLeave = () =>
-      gsap.to([dot, ring, arrow], { opacity: 0, duration: 0.25, ease: "power2.out" });
-    const onEnter = () => {
+    const onLeave = () => {
       visible = false;
+      gsap.to(rootEl, { opacity: 0, duration: 0.2, ease: "power2.out" });
     };
 
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerover", onOver, { passive: true });
-    window.addEventListener("pointerdown", onDown, { passive: true });
-    window.addEventListener("pointerup", onUp, { passive: true });
-    document.addEventListener("pointerleave", onLeave);
-    document.addEventListener("pointerenter", onEnter);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
 
     return () => {
       document.documentElement.classList.remove("has-custom-cursor");
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerover", onOver);
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointerup", onUp);
-      document.removeEventListener("pointerleave", onLeave);
-      document.removeEventListener("pointerenter", onEnter);
+      window.removeEventListener("scroll", onScroll);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      gsap.killTweensOf([rootEl, cross, ibeam, armUp, armDown, armLeft, armRight, bar, capTop, capBottom]);
     };
   }, []);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-[9999]">
-      {/* Ring — elastic lag */}
-      <div
-        ref={ringRef}
-        className="absolute left-0 top-0 h-10 w-10 rounded-full border border-white opacity-0 mix-blend-difference [will-change:transform]"
-      />
-      {/* Dot — exact */}
-      <div
-        ref={dotRef}
-        className="absolute left-0 top-0 h-[6px] w-[6px] rounded-full bg-white opacity-0 mix-blend-difference [will-change:transform]"
-      />
-      {/* Arrow — CTA morph */}
-      <div
-        ref={arrowRef}
-        className="absolute left-0 top-0 opacity-0 mix-blend-difference [will-change:transform]"
-      >
-        <svg
-          width="30"
-          height="30"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="white"
-          strokeWidth="1.5"
-          strokeLinecap="square"
-        >
-          <path d="M7 17 17 7" />
-          <path d="M8 7h9v9" />
-        </svg>
+    <div
+      aria-hidden
+      ref={rootRef}
+      className="pointer-events-none fixed left-0 top-0 z-[9999] -ml-[60px] -mt-[60px] h-[120px] w-[120px] opacity-0 [will-change:transform] [filter:drop-shadow(0_0_2px_rgba(0,0,0,0.55))_drop-shadow(0_1px_4px_rgba(0,0,0,0.3))]"
+    >
+      {/* The instrument is anchored at the centre of a real 120×120 box, so
+          no state (crosshair, glass spread, tallest I-beam) ever extends
+          past the element's bounds — filtered zero-size roots get their
+          overflowing children clipped in some engines (Safari). */}
+      {/* Crosshair — four arms around a hollow centre */}
+      <div className="cur-cross absolute left-1/2 top-1/2">
+        <div className="cur-arm absolute left-0 top-0 bg-white" />
+        <div className="cur-arm absolute left-0 top-0 bg-white" />
+        <div className="cur-arm absolute left-0 top-0 bg-white" />
+        <div className="cur-arm absolute left-0 top-0 bg-white" />
+      </div>
+      {/* I-beam — sized to the hovered text */}
+      <div className="cur-ibeam absolute left-1/2 top-1/2">
+        <div className="absolute left-0 top-0 bg-white" />
+        <div className="absolute left-0 top-0 bg-white" />
+        <div className="absolute left-0 top-0 bg-white" />
       </div>
     </div>
   );

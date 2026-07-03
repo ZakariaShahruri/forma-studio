@@ -77,11 +77,18 @@ public/videos/    # walkthrough.mp4 — the scroll-driven house walkthrough
 
 ## Custom cursor
 
-`components/Cursor.tsx` replaces the native cursor with a two-part
-instrument: an **exact dot** and a **ring** that trails with an elastic
-settle. Hovering `[data-cursor="glass"]` expands the ring to frame the
-surface; `[data-cursor="cta"]` morphs the cursor into an arrow. Fine
-pointers only; `prefers-reduced-motion` drops the elastic lag.
+`components/Cursor.tsx` replaces the native cursor with a fine
+**crosshair** — four hairline arms around a hollow centre, like a
+drafting instrument. Position tracking is immediate (no easing, no lag).
+
+- **Interactive** (`[data-cursor="cta"]`, links, buttons) — the sight
+  rotates 45° and contracts.
+- **Text** — becomes a thin I-beam sized from the hovered type: bar
+  height follows font-size, bar weight follows font-weight.
+- **Glass** (`[data-cursor="glass"]`) — the arms travel outward slowly,
+  as if measuring the surface.
+
+Fine pointers only; `prefers-reduced-motion` makes state changes instant.
 
 ## Development
 
