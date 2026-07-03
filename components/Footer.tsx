@@ -16,17 +16,27 @@ export function Footer() {
 
   useEffect(() => {
     if (!root.current) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const ctx = gsap.context(() => {
+      /* Scrubbed rather than one-shot: the fade tracks the footer's entry
+         below the released pin exactly, and reverses smoothly if the user
+         scrolls back up into the walkthrough. Opacity only — a y-drift on
+         the trigger itself would stretch the document and push the scrub's
+         end past the reachable scroll range. */
       gsap.fromTo(
         root.current,
         { autoAlpha: 0 },
         {
           autoAlpha: 1,
-          duration: reduce ? 0.2 : 0.9,
-          ease: "power2.out",
-          scrollTrigger: { trigger: root.current, start: "top 92%" },
+          ease: "none",
+          scrollTrigger: {
+            trigger: root.current,
+            /* Only the footer's own height of scroll exists after the pin,
+               so the fade must complete exactly when the document ends. */
+            start: "top bottom",
+            end: "bottom bottom",
+            scrub: true,
+          },
         }
       );
     }, root);

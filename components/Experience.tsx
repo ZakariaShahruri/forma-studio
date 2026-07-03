@@ -56,16 +56,22 @@ export function Experience() {
       const panels = gsap.utils.toArray<HTMLElement>(".panel");
       const fill = section.querySelector<HTMLElement>(".progress-fill");
       const hint = section.querySelector<HTMLElement>(".scroll-hint");
+      const endFade = section.querySelector<HTMLElement>(".end-fade");
 
       gsap.set(panels, { autoAlpha: 0 });
 
       /* Scrub the video. The short tween acts as inertia smoothing so the
          decoder isn't hammered with a seek on every scroll event. The video
-         itself never plays — only currentTime moves. */
+         itself never plays — only currentTime moves.
+
+         The video completes at SCRUB_END of the pin, not at 1: the seek tween
+         trails scroll by ~0.4s, so finishing early guarantees the walkthrough
+         is fully seen — final frame held — before the pin releases. */
+      const SCRUB_END = 0.94;
       const seek = (p: number) => {
         const d = video.duration;
         if (!d || Number.isNaN(d)) return;
-        const t = Math.min(p, 0.999) * d;
+        const t = Math.min(p / SCRUB_END, 0.9975) * d;
         if (reduce) {
           video.currentTime = t;
           return;
@@ -142,6 +148,15 @@ export function Experience() {
         seek(p);
         if (fill) gsap.set(fill, { scaleY: p });
 
+        /* Ease the handoff to the footer: once the video has completed,
+           the last stretch of the pin dims toward charcoal so the release
+           is a soft transition rather than a hard cut. */
+        if (endFade) {
+          gsap.set(endFade, {
+            opacity: gsap.utils.clamp(0, 1, (p - 0.96) / 0.04) * 0.45,
+          });
+        }
+
         if (hint && !hintGone && p > 0.004) {
           hintGone = true;
           gsap.to(hint, { autoAlpha: 0, duration: 0.5, ease: "power2.out" });
@@ -187,6 +202,10 @@ export function Experience() {
         preload="auto"
         tabIndex={-1}
       />
+
+      {/* Uniform charcoal dim over the final stretch of the pin — no
+          gradient, just a quiet fade toward the footer's surface. */}
+      <div className="end-fade pointer-events-none absolute inset-0 bg-charcoal opacity-0" />
 
       {/* Panels */}
       <div className="pointer-events-none absolute inset-0">
