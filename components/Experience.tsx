@@ -1,8 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
-import { submitInquiry, type InquiryState } from "@/app/actions";
+import {
+  NameContent,
+  PhilosophyContent,
+  StatsContent,
+  WorksContent,
+  ContactContent,
+} from "@/components/panels";
 
 /* The pin lasts 600% of the viewport — every scroll position maps to a
    progress value in [0, 1] that drives the video frame, the progress line
@@ -26,24 +32,143 @@ export const SCROLL_TARGETS = {
   contact: 0.96,
 } as const;
 
-const STATS = [
-  { label: "Projects", value: 142 },
-  { label: "Countries", value: 28 },
-  { label: "Awards", value: 6 },
-];
+type Env = { mode: "mobile" | "desktop"; low: boolean };
 
-const WORKS = [
-  { name: "Casa Lumen", category: "Private Residence", year: "2023" },
-  { name: "The Quarry", category: "Cultural Pavilion", year: "2024" },
-  { name: "Atelier Grey", category: "Interior", year: "2021" },
-];
+/* Touch devices and small screens get the static experience; on desktop,
+   few cores / little memory / a constrained connection selects the low
+   tier: 720p video, opacity-only transitions, no backdrop blur. */
+function detectEnv(): Env {
+  const mobile =
+    window.matchMedia("(max-width: 767px)").matches ||
+    window.matchMedia("(pointer: coarse) and (hover: none)").matches;
 
-const INITIAL: InquiryState = { status: "idle", message: "" };
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean; effectiveType?: string };
+  };
+  const cores = nav.hardwareConcurrency ?? 8;
+  const memory = nav.deviceMemory ?? 8;
+  const conn = nav.connection;
+  const slowNet =
+    !!conn && (!!conn.saveData || /(slow-2g|2g|3g)/.test(conn.effectiveType ?? ""));
+
+  return { mode: mobile ? "mobile" : "desktop", low: cores <= 4 || memory <= 4 || slowNet };
+}
 
 export function Experience() {
+  const [env, setEnv] = useState<Env | null>(null);
+
+  useEffect(() => {
+    setEnv(detectEnv());
+  }, []);
+
+  if (env?.mode === "mobile") return <MobileExperience />;
+  if (env?.mode === "desktop") return <DesktopExperience low={env.low} />;
+
+  /* Pre-hydration / first frame: the same exterior still both paths open
+     on, so whichever experience mounts is visually continuous. */
+  return (
+    <main id="top" className="relative h-svh overflow-hidden bg-charcoal text-white">
+      <img
+        src="/images/preloader.jpg"
+        alt=""
+        fetchPriority="high"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+    </main>
+  );
+}
+
+/* =====================================================================
+   Mobile — the walkthrough video is replaced by the exterior still as a
+   fixed backdrop; the panels stack and scroll normally. No pin, no
+   scrubbing, no per-frame work at all: reveals are IntersectionObserver
+   toggling a CSS opacity transition.
+   ===================================================================== */
+function MobileExperience() {
+  const root = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.2 }
+    );
+    root.current
+      ?.querySelectorAll(".m-reveal")
+      .forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  const section = "flex min-h-svh items-center justify-center px-5 py-24";
+  const card = "glass m-reveal w-full max-w-xl p-8";
+
+  return (
+    <main
+      id="top"
+      ref={root}
+      data-experience="mobile"
+      className="relative bg-charcoal text-white"
+    >
+      {/* Static full-viewport backdrop — the house exterior. A uniform dim
+          keeps the glass text legible at every scroll position. */}
+      <div className="fixed inset-0" aria-hidden>
+        <img
+          src="/images/preloader.jpg"
+          alt=""
+          fetchPriority="high"
+          className="h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-charcoal/35" />
+      </div>
+
+      <div className="relative">
+        <section className={section}>
+          <div data-scene="dark" className={`${card} text-center`}>
+            <NameContent />
+          </div>
+        </section>
+
+        <section id="studio" className={section}>
+          <div data-scene="dark" className={card}>
+            <PhilosophyContent animated={false} />
+          </div>
+        </section>
+
+        <section className={section}>
+          <div data-scene="dark" className={card}>
+            <StatsContent animated={false} />
+          </div>
+        </section>
+
+        <section id="works" className={section}>
+          <div data-scene="dark" className={card}>
+            <WorksContent />
+          </div>
+        </section>
+
+        <section id="contact" className={section}>
+          <div data-scene="dark" className={card}>
+            <ContactContent />
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+/* =====================================================================
+   Desktop — the pinned, scroll-scrubbed walkthrough.
+   ===================================================================== */
+function DesktopExperience({ low }: { low: boolean }) {
   const root = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [inquiry, formAction, pending] = useActionState(submitInquiry, INITIAL);
 
   useEffect(() => {
     const section = root.current;
@@ -51,6 +176,9 @@ export function Experience() {
     if (!section || !video) return;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    /* Low tier drops transform work from panel transitions entirely —
+       fades are opacity-only, exactly like reduced motion. */
+    const simple = reduce || low;
     let removeVideoListeners = () => {};
     let removePreloader = () => {};
 
@@ -121,13 +249,23 @@ export function Experience() {
         }
       };
 
+      /* will-change is applied only for the duration of a transition and
+         released as soon as it completes — holding layers alive across the
+         whole pin is what causes compositor pressure on weaker GPUs. */
       const show = (idx: number) => {
         const panel = panels[idx];
         gsap.killTweensOf(panel);
+        gsap.set(panel, { willChange: simple ? "opacity" : "opacity, transform" });
         gsap.fromTo(
           panel,
-          { autoAlpha: 0, y: reduce ? 0 : 28 },
-          { autoAlpha: 1, y: 0, duration: reduce ? 0.2 : 0.8, ease: "power3.out" }
+          { autoAlpha: 0, y: simple ? 0 : 28 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: reduce ? 0.2 : low ? 0.5 : 0.8,
+            ease: "power3.out",
+            onComplete: () => gsap.set(panel, { willChange: "auto" }),
+          }
         );
         enterEffects(idx, panel);
       };
@@ -135,11 +273,13 @@ export function Experience() {
       const hide = (idx: number) => {
         const panel = panels[idx];
         gsap.killTweensOf(panel);
+        gsap.set(panel, { willChange: simple ? "opacity" : "opacity, transform" });
         gsap.to(panel, {
           autoAlpha: 0,
-          y: reduce ? 0 : -18,
-          duration: reduce ? 0.15 : 0.45,
+          y: simple ? 0 : -18,
+          duration: reduce ? 0.15 : low ? 0.3 : 0.45,
           ease: "power2.in",
+          onComplete: () => gsap.set(panel, { willChange: "auto" }),
         });
       };
 
@@ -150,13 +290,14 @@ export function Experience() {
          panel and flip its tint — white glass over dark scenes, dark glass
          over light ones. The frame is drawn into a tiny canvas and only the
          region under the panel (mapped through object-cover) is averaged.
-         Thresholds have hysteresis so mid-tone frames never flicker. */
+         Thresholds have hysteresis so mid-tone frames never flicker.
+         Skipped entirely on the low tier, whose glass is a solid tint. */
       const sceneCanvas = document.createElement("canvas");
       sceneCanvas.width = 96;
       sceneCanvas.height = 54;
-      const sceneCtx = sceneCanvas.getContext("2d", {
-        willReadFrequently: true,
-      });
+      const sceneCtx = low
+        ? null
+        : sceneCanvas.getContext("2d", { willReadFrequently: true });
       let lastSample = 0;
 
       const sampleScene = (panel: HTMLElement) => {
@@ -195,6 +336,7 @@ export function Experience() {
       };
 
       const sampleActive = (force = false) => {
+        if (!sceneCtx) return;
         const now = performance.now();
         if (!force && now - lastSample < 180) return;
         lastSample = now;
@@ -341,19 +483,22 @@ export function Experience() {
       removeVideoListeners();
       ctx.revert();
     };
-  }, []);
+  }, [low]);
 
   return (
     <main
       id="top"
       ref={root}
-      className="relative h-svh overflow-hidden bg-charcoal text-white"
+      className={`relative h-svh overflow-hidden bg-charcoal text-white ${
+        low ? "perf-low" : ""
+      }`}
     >
       {/* Scroll-driven walkthrough. Never autoplays — currentTime is set
-          from scroll position only. */}
+          from scroll position only. The low tier decodes the 720p
+          rendition: half the pixels, half the bandwidth. */}
       <video
         ref={videoRef}
-        src="/videos/walkthrough.mp4"
+        src={low ? "/videos/walkthrough-720.mp4" : "/videos/walkthrough.mp4"}
         className="absolute inset-0 h-full w-full object-cover"
         muted
         playsInline
@@ -373,13 +518,7 @@ export function Experience() {
           data-scene="dark"
           className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,64rem)] -translate-x-1/2 -translate-y-1/2 px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
         >
-          <h1 className="display text-hero uppercase leading-[0.95]">
-            <span className="block">Forma</span>
-            <span className="block">Studio</span>
-          </h1>
-          <p className="label mt-8 text-white/95">
-            Architecture &amp; Interior Design — Est. 1998
-          </p>
+          <NameContent />
         </div>
 
         {/* 2 — entrance: philosophy */}
@@ -388,13 +527,7 @@ export function Experience() {
           data-scene="dark"
           className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,34rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
-          <h2 className="display text-title">We design spaces that endure.</h2>
-          <span className="draw-line mt-5 block h-px w-full scale-x-0 bg-white/80" />
-          <p className="mt-6 max-w-[38ch] text-base leading-relaxed text-white/95">
-            Forma works at the meeting point of architecture and interior — one
-            continuous discipline, not two. We build slowly, precisely, and only
-            what deserves to remain.
-          </p>
+          <PhilosophyContent animated />
         </div>
 
         {/* 3 — threshold: stats */}
@@ -403,18 +536,7 @@ export function Experience() {
           data-scene="dark"
           className="panel glass pointer-events-auto absolute right-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(84vw,22rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
-          <div className="flex flex-col gap-8">
-            {STATS.map((stat) => (
-              <div key={stat.label}>
-                <span className="label block text-white/95">{stat.label}</span>
-                <span className="display mt-1 block text-display tabular-nums">
-                  <span className="stat-num" data-target={stat.value}>
-                    0
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
+          <StatsContent animated />
         </div>
 
         {/* 4 — living space: selected works */}
@@ -423,28 +545,7 @@ export function Experience() {
           data-scene="dark"
           className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,54rem)] -translate-x-1/2 -translate-y-1/2 p-[clamp(2rem,4vw,3.5rem)]"
         >
-          <h2 className="display text-display uppercase">Selected Works</h2>
-          <ul className="mt-8">
-            {WORKS.map((work) => (
-              <li
-                key={work.name}
-                className="flex items-baseline justify-between gap-6 border-t border-white/15 py-4"
-              >
-                <span className="display text-heading">{work.name}</span>
-                <span className="label ml-auto text-white/95">
-                  {work.category}
-                </span>
-                <span className="label text-white/95">{work.year}</span>
-              </li>
-            ))}
-          </ul>
-          <a
-            href="mailto:studio@formastudio.example?subject=Portfolio%20request"
-            data-cursor="cta"
-            className="label mt-8 inline-block text-white/95 transition-opacity duration-300 hover:opacity-60 [letter-spacing:0.18em]"
-          >
-            View All
-          </a>
+          <WorksContent />
         </div>
 
         {/* 5 — toward the window: contact */}
@@ -453,47 +554,7 @@ export function Experience() {
           data-scene="dark"
           className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,32rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
-          <h2 className="display text-title">Start a project.</h2>
-
-          {inquiry.status === "sent" ? (
-            <p className="mt-8 text-base text-white/95">{inquiry.message}</p>
-          ) : (
-            <form action={formAction} className="mt-8">
-              <div className="flex items-end gap-4">
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  placeholder="Your email"
-                  aria-label="Your email"
-                  className="w-full border-0 border-b border-white/40 bg-transparent py-2 text-base text-white outline-none transition-colors duration-300 placeholder:text-white/75 focus:border-white/80"
-                />
-                <button
-                  type="submit"
-                  disabled={pending}
-                  data-cursor="cta"
-                  className="label shrink-0 pb-2 text-white transition-opacity duration-300 hover:opacity-60 disabled:opacity-40"
-                >
-                  {pending ? "Sending" : "Send"}
-                </button>
-              </div>
-              {inquiry.status === "error" && (
-                <p className="mt-3 text-sm text-white/95">{inquiry.message}</p>
-              )}
-            </form>
-          )}
-
-          <div className="mt-10 text-base text-white/95">
-            <a
-              href="mailto:studio@formastudio.example"
-              data-cursor="cta"
-              className="transition-colors duration-300 hover:text-white"
-            >
-              studio@formastudio.example
-            </a>
-            <br />
-            Copenhagen
-          </div>
+          <ContactContent />
         </div>
       </div>
 

@@ -3,15 +3,22 @@
 import { useEffect, useState } from "react";
 import { PIN_LENGTH, SCROLL_TARGETS } from "@/components/Experience";
 
-/* The site is one pinned scroll track, so links scroll to progress
-   fractions along it rather than to anchors. */
+/* On desktop the site is one pinned scroll track, so links scroll to
+   progress fractions along it. The mobile layout stacks real sections,
+   so the same links fall back to their anchors. */
 const LINKS = [
-  { label: "Studio", to: SCROLL_TARGETS.studio },
-  { label: "Works", to: SCROLL_TARGETS.works },
-  { label: "Contact", to: SCROLL_TARGETS.contact },
+  { label: "Studio", to: SCROLL_TARGETS.studio, anchor: "studio" },
+  { label: "Works", to: SCROLL_TARGETS.works, anchor: "works" },
+  { label: "Contact", to: SCROLL_TARGETS.contact, anchor: "contact" },
 ];
 
-function scrollToProgress(fraction: number) {
+function scrollToProgress(fraction: number, anchor?: string) {
+  if (document.querySelector('[data-experience="mobile"]')) {
+    const target = anchor ? document.getElementById(anchor) : null;
+    if (target) target.scrollIntoView({ behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
   window.scrollTo({
     top: fraction * PIN_LENGTH * window.innerHeight,
     behavior: "smooth",
@@ -65,7 +72,7 @@ export function Navbar() {
               <li key={link.label}>
                 <button
                   type="button"
-                  onClick={() => scrollToProgress(link.to)}
+                  onClick={() => scrollToProgress(link.to, link.anchor)}
                   data-cursor="cta"
                   className="label text-white transition-opacity duration-300 hover:opacity-50"
                 >
@@ -132,7 +139,7 @@ export function Navbar() {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    scrollToProgress(link.to);
+                    scrollToProgress(link.to, link.anchor);
                   }}
                   data-cursor="cta"
                   className="display block text-left text-[15vw] leading-[1.05] text-charcoal transition-opacity duration-300 hover:opacity-50"

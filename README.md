@@ -38,7 +38,26 @@ Scroll position maps to a progress value in `[0, 1]` that drives everything:
   user moves.
 
 The navbar scrolls to fractions of the pin length (`SCROLL_TARGETS`)
-rather than to anchors, since the document is one pinned track.
+rather than to anchors, since the document is one pinned track. (On the
+mobile layout the same links fall back to real section anchors.)
+
+## Performance tiers
+
+The experience adapts to the device rather than breaking on it:
+
+- **Mobile / touch** (small screens or coarse pointers) — no video at
+  all. The exterior still becomes a fixed backdrop, the five glass
+  panels stack into normally-scrolled sections, and reveals are
+  IntersectionObserver + CSS opacity. No pinning, no scrubbing.
+- **Low-tier desktop** (≤4 cores, ≤4 GB device memory, or a constrained
+  connection via the Network Information API) — decodes the 720p
+  rendition (`walkthrough-720.mp4`, produced with `avconvert`), panel
+  transitions become opacity-only, and the glass drops backdrop blur
+  for a solid tint that keeps text above WCAG AA.
+- **High-tier desktop** — the full 1080p scrub with adaptive glass.
+
+GSAP transitions set `will-change` only while animating and release it
+on complete; all ScrollTriggers and listeners are torn down on unmount.
 
 ## Design system
 
@@ -75,10 +94,11 @@ app/
   fonts.ts        # next/font/local declarations
   fonts/          # PP Editorial New + Neue Montreal files
 components/
-  Experience.tsx  # pinned scroll track: video scrub, panels, progress line
+  Experience.tsx  # env detection + desktop (pinned scrub) & mobile layouts
+  panels.tsx      # shared panel content (name, philosophy, stats, works, contact)
   Navbar.tsx      # transparent → frosted on scroll; scrolls to track positions
   Cursor.tsx      # custom cursor (see below)
-public/videos/    # walkthrough.mp4 — the scroll-driven house walkthrough
+public/videos/    # walkthrough.mp4 (1080p) + walkthrough-720.mp4 (low tier)
 public/images/    # preloader.jpg — exterior still shown while buffering
 ```
 

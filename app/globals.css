@@ -109,6 +109,28 @@ body {
   background-color: rgba(0, 0, 0, 0.25);
 }
 
+/* Low-power desktop tier — the glass keeps its geometry but drops the
+   backdrop blur entirely (recomputing a blurred backdrop during fades is
+   the single most expensive animation on weak GPUs). A solid tint keeps
+   white text above WCAG AA on any frame. */
+.perf-low .glass,
+.perf-low .glass[data-scene="light"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgba(17, 17, 16, 0.8);
+  transition: none;
+}
+
+/* Mobile reveal — opacity only, driven by IntersectionObserver */
+.m-reveal {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.m-reveal.is-in {
+  opacity: 1;
+}
+
 /* Gentle opacity pulse for the scroll indicator */
 @keyframes pulse-soft {
   0%,
