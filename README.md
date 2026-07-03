@@ -1,79 +1,80 @@
 # FORMA STUDIO
 
 Portfolio site for a boutique architecture and interior design studio.
-Ultra-minimal, built around restraint — three colours, two typefaces, and
-motion that behaves like a precision instrument. The brief was that it should
-feel like the studio built it themselves.
+The entire site is a single full-viewport experience: a house walkthrough
+video driven frame-by-frame by scroll, with glassmorphism panels surfacing
+at fixed points along the way. Three colours, two typefaces, and motion
+that behaves like a precision instrument.
 
 ## Stack
 
 - **Next.js 15** (App Router) + **React 19** + **TypeScript**
 - **Tailwind CSS v4** — theme tokens defined in `app/globals.css` via `@theme`
-- **GSAP 3** — `ScrollTrigger` for reveals, `Flip` for layout morphs, `quickTo`
-  for the cursor. (GSAP is fully free as of 2025, including all plugins.)
+- **GSAP 3** — `ScrollTrigger` pins the viewport and scrubs the video,
+  `quickTo` drives the cursor. (GSAP is fully free as of 2025.)
+- **Server Action** (`app/actions.ts`) handles the contact form.
+
+## The scroll experience
+
+`components/Experience.tsx` pins the viewport for **600vh** of scroll.
+Scroll position maps to a progress value in `[0, 1]` that drives everything:
+
+- **Video scrub** — `/public/videos/walkthrough.mp4` never plays;
+  `currentTime` is tweened toward `progress × duration` on every scroll
+  update, so scrolling forward advances the walkthrough and scrolling
+  back retreats it.
+- **Panels** — five `.glass` panels each own a progress window
+  (`PANEL_RANGES`). Windows never overlap, so no two panels are visible
+  at once. Panels fade in/out on entering/leaving their window; panel 2
+  draws an underline, panel 3 counts its stats up from zero.
+- **Progress line** — a hairline on the right edge fills with progress.
+- **Scroll hint** — pulses at the start, fades permanently once the
+  user moves.
+
+The navbar scrolls to fractions of the pin length (`SCROLL_TARGETS`)
+rather than to anchors, since the document is one pinned track.
 
 ## Design system
 
-Three colours only. No gradients, no shadows, no decorative elements.
+Three colours only. The frosted glass panels (blur + hairline border +
+soft inner glow) are the one sanctioned exception to the no-shadow rule.
 
 | Token             | Value     | Use                        |
 | ----------------- | --------- | -------------------------- |
-| `--color-white`   | `#fafaf8` | Warm white — base surface  |
-| `--color-charcoal`| `#111110` | Deep charcoal — ink        |
-| `--color-concrete`| `#8a8a85` | Raw concrete — mid-tone    |
+| `--color-white`   | `#fafaf8` | Warm white — type on video |
+| `--color-charcoal`| `#111110` | Deep charcoal — base       |
+| `--color-concrete`| `#8a8a85` | Raw concrete — labels      |
 
 **Type**
 - **PP Editorial New** — display headings (Ultralight 200 / Regular 400).
-  Monumental and optical at hero sizes.
 - **Neue Montreal** — all UI text, captions, labels, body (Regular / Medium).
-  Precise and neutral. `12px` for nav and labels.
 
-Both are loaded locally via `next/font/local` (`app/fonts.ts`). The fluid
-display scale (`--text-hero` → `--text-label`) lives in `app/globals.css`.
+Both are loaded locally via `next/font/local` (`app/fonts.ts`).
 
 ## Structure
 
 ```
 app/
   layout.tsx      # fonts, metadata, mounts <Cursor /> + <Navbar />
-  page.tsx        # section composition
-  globals.css     # design tokens, base styles, cursor hiding
+  page.tsx        # renders <Experience />
+  actions.ts      # Server Action for the project-inquiry form
+  globals.css     # design tokens, base styles, .glass, cursor hiding
   fonts.ts        # next/font/local declarations
   fonts/          # PP Editorial New + Neue Montreal files
 components/
-  Navbar.tsx      # transparent → frosted on scroll; mobile slide-in menu
-  Hero.tsx        # monumental wordmark, masked line-reveal + parallax
-  Statement.tsx   # scrubbed line-by-line reveal
-  Work.tsx        # four project panels; clip-path wipe + in-view playback
-  Approach.tsx    # capabilities index, list ⇄ grid via GSAP Flip
-  Footer.tsx      # charcoal contact section
+  Experience.tsx  # pinned scroll track: video scrub, panels, progress line
+  Navbar.tsx      # transparent → frosted on scroll; scrolls to track positions
   Cursor.tsx      # custom cursor (see below)
-lib/
-  gsap.ts         # registers ScrollTrigger + Flip once, client-side
-public/videos/    # clip_1–4.mp4 project media
+public/videos/    # walkthrough.mp4 — the scroll-driven house walkthrough
 ```
 
 ## Custom cursor
 
-`components/Cursor.tsx` replaces the native cursor with a two-part instrument:
-
-- an **exact dot** that tracks the pointer with no lag, and
-- a **ring** that trails with an elastic settle (`elastic.out`).
-
-State is resolved by walking up from the hovered element:
-
-- `[data-cursor="glass"]` — ring **expands** to frame the surface
-  (navbar, project media).
-- `[data-cursor="cta"]` — cursor **morphs into an arrow**
-  (links, buttons, mailto CTAs).
-
-It only activates for `(pointer: fine)` devices — touch keeps the native
-cursor. The native cursor is hidden via a JS-set `.has-custom-cursor` class, so
-if JS never runs the cursor is preserved. `prefers-reduced-motion` drops the
-elastic lag.
-
-To make a new element interactive, add `data-cursor="glass"` or
-`data-cursor="cta"`.
+`components/Cursor.tsx` replaces the native cursor with a two-part
+instrument: an **exact dot** and a **ring** that trails with an elastic
+settle. Hovering `[data-cursor="glass"]` expands the ring to frame the
+surface; `[data-cursor="cta"]` morphs the cursor into an arrow. Fine
+pointers only; `prefers-reduced-motion` drops the elastic lag.
 
 ## Development
 
@@ -86,7 +87,10 @@ npm start        # serve the production build
 
 ## Notes
 
-- **Fonts** — PP Editorial New and Neue Montreal (Pangram Pangram) are free for
-  personal use. Confirm proper licensing before any commercial deployment.
-- The project videos are committed directly to the repo; consider Git LFS if
-  they grow or change often.
+- **Fonts** — PP Editorial New and Neue Montreal (Pangram Pangram) are free
+  for personal use. Confirm proper licensing before any commercial deployment.
+- **Video** — `walkthrough.mp4` is scrubbed by scroll, so seek performance
+  depends on keyframe density. If scrubbing ever feels steppy, re-encode
+  with a short GOP (e.g. `ffmpeg … -g 8`).
+- The inquiry form's Server Action currently logs to the server; wire it to
+  a mailer or CRM before launch.

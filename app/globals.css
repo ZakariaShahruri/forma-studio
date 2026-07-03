@@ -32,12 +32,8 @@
 }
 
 /* ---- Base ------------------------------------------------- */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* No custom reset here: Tailwind preflight already zeroes margins/padding,
+   and an unlayered `*` rule would override every spacing utility. */
 
 html {
   -webkit-font-smoothing: antialiased;
@@ -47,8 +43,8 @@ html {
 }
 
 body {
-  background-color: var(--color-white);
-  color: var(--color-charcoal);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
   font-family: var(--font-ui);
   font-size: var(--text-body);
   line-height: 1.5;
@@ -57,8 +53,8 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-charcoal);
-  color: var(--color-white);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
 }
 
 /* Display type — tight, optical, monumental */
@@ -87,6 +83,32 @@ body {
 .rule {
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--color-concrete) 45%, transparent);
+}
+
+/* Glassmorphism panel — frosted blur, hairline border, soft inner glow.
+   The inner glow is the one sanctioned exception to the no-shadow rule:
+   it is what makes the glass read as glass over the moving video. */
+.glass {
+  background-color: color-mix(in srgb, var(--color-charcoal) 28%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 60px rgba(255, 255, 255, 0.07);
+}
+
+/* Gentle opacity pulse for the scroll indicator */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.pulse-soft {
+  animation: pulse-soft 2.6s ease-in-out infinite;
 }
 
 /* Custom cursor — hide the native one once the instrument takes over.
