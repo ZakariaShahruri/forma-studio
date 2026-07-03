@@ -68,7 +68,9 @@ inset-only shadows — and adapt to the video behind them: white glass
 (`rgba(0,0,0,0.25)`) over light ones. Brightness is sampled from the
 video frame under the active panel (tiny canvas, luminance average,
 hysteresis at 0.36/0.42 so mid-tones never flicker) — the flip point is
-where white text would stop passing WCAG AA. All panel text carries a
+where white text would stop passing WCAG AA. The opening name panel (and
+its preloader twin) is fixed dark glass and excluded from sampling: its
+backdrop is always the bright-skied exterior. All panel text carries a
 soft text-shadow for legibility on any frame.
 
 | Token             | Value     | Use                        |

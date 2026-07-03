@@ -22,13 +22,16 @@ export const WORKS = [
 
 const INITIAL: InquiryState = { status: "idle", message: "" };
 
-export function NameContent() {
+export function NameContent({ heading = true }: { heading?: boolean }) {
+  /* The preloader renders the same lockup, but the document's one <h1>
+     belongs to the experience itself. */
+  const Tag = heading ? "h1" : "div";
   return (
     <>
-      <h1 className="display text-hero uppercase leading-[0.95]">
+      <Tag className="display text-hero uppercase leading-[0.95]">
         <span className="block">Forma</span>
         <span className="block">Studio</span>
-      </h1>
+      </Tag>
       <p className="label mt-8 text-white/95">
         Architecture &amp; Interior Design — Est. 1998
       </p>
@@ -56,11 +59,15 @@ export function PhilosophyContent({ animated }: { animated: boolean }) {
 
 export function StatsContent({ animated }: { animated: boolean }) {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-[clamp(1.25rem,3.5vh,2.5rem)]">
       {STATS.map((stat) => (
         <div key={stat.label}>
           <span className="label block text-white/95">{stat.label}</span>
-          <span className="display mt-1 block text-display tabular-nums">
+          {/* leading-none, not the display class's 0.92 — at these sizes a
+              sub-1 line-height lets glyphs paint outside their line box and
+              collide with the neighbouring labels. Sized against both axes
+              so the three stats always sit inside the viewport. */}
+          <span className="font-display mt-2 block text-[clamp(2.5rem,min(5.5vw,9svh),5rem)] font-extralight leading-none tracking-[-0.02em] tabular-nums">
             {animated ? (
               <span className="stat-num" data-target={stat.value}>
                 0

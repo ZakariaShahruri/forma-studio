@@ -130,31 +130,31 @@ function MobileExperience() {
 
       <div className="relative">
         <section className={section}>
-          <div data-scene="dark" className={`${card} text-center`}>
+          <div data-scene="light" className={`${card} text-center`}>
             <NameContent />
           </div>
         </section>
 
         <section id="studio" className={section}>
-          <div data-scene="dark" className={card}>
+          <div data-scene="light" className={card}>
             <PhilosophyContent animated={false} />
           </div>
         </section>
 
         <section className={section}>
-          <div data-scene="dark" className={card}>
+          <div data-scene="light" className={card}>
             <StatsContent animated={false} />
           </div>
         </section>
 
         <section id="works" className={section}>
-          <div data-scene="dark" className={card}>
+          <div data-scene="light" className={card}>
             <WorksContent />
           </div>
         </section>
 
         <section id="contact" className={section}>
-          <div data-scene="dark" className={card}>
+          <div data-scene="light" className={card}>
             <ContactContent />
           </div>
         </section>
@@ -188,7 +188,16 @@ function DesktopExperience({ low }: { low: boolean }) {
       const hint = section.querySelector<HTMLElement>(".scroll-hint");
       const endFade = section.querySelector<HTMLElement>(".end-fade");
 
-      gsap.set(panels, { autoAlpha: 0 });
+      /* GSAP owns panel centering outright (xPercent/yPercent) — mixing a
+         CSS translate class with GSAP y-tweens loses the -50% whenever the
+         first tween's transform parse misses it. */
+      panels.forEach((panel) => {
+        gsap.set(panel, {
+          autoAlpha: 0,
+          yPercent: -50,
+          xPercent: panel.dataset.center === "both" ? -50 : 0,
+        });
+      });
 
       /* Scrub the video. The short tween acts as inertia smoothing so the
          decoder isn't hammered with a seek on every scroll event. The video
@@ -340,7 +349,8 @@ function DesktopExperience({ low }: { low: boolean }) {
         const now = performance.now();
         if (!force && now - lastSample < 180) return;
         lastSample = now;
-        if (active !== -1) sampleScene(panels[active]);
+        // Panel 1 keeps its fixed dark glass — see its markup.
+        if (active > 0) sampleScene(panels[active]);
       };
 
       const onFrame = () => sampleActive();
@@ -512,11 +522,14 @@ function DesktopExperience({ low }: { low: boolean }) {
 
       {/* Panels */}
       <div className="pointer-events-none absolute inset-0">
-        {/* 1 — exterior: studio name */}
+        {/* 1 — exterior: studio name. Always dark glass and excluded from
+            scene sampling: its backdrop is the bright-skied exterior (still
+            and video alike), where white glass washes the name out. */}
         <div
           data-cursor="glass"
-          data-scene="dark"
-          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,64rem)] -translate-x-1/2 -translate-y-1/2 px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
+          data-scene="light"
+          data-center="both"
+          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,64rem)] px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
         >
           <NameContent />
         </div>
@@ -525,7 +538,8 @@ function DesktopExperience({ low }: { low: boolean }) {
         <div
           data-cursor="glass"
           data-scene="dark"
-          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,34rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
+          data-center="y"
+          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,34rem)] p-[clamp(2rem,3.5vw,3rem)]"
         >
           <PhilosophyContent animated />
         </div>
@@ -534,7 +548,8 @@ function DesktopExperience({ low }: { low: boolean }) {
         <div
           data-cursor="glass"
           data-scene="dark"
-          className="panel glass pointer-events-auto absolute right-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(84vw,22rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
+          data-center="y"
+          className="panel glass pointer-events-auto absolute right-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(84vw,22rem)] p-[clamp(2rem,3.5vw,3rem)]"
         >
           <StatsContent animated />
         </div>
@@ -543,7 +558,8 @@ function DesktopExperience({ low }: { low: boolean }) {
         <div
           data-cursor="glass"
           data-scene="dark"
-          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,54rem)] -translate-x-1/2 -translate-y-1/2 p-[clamp(2rem,4vw,3.5rem)]"
+          data-center="both"
+          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,54rem)] p-[clamp(2rem,4vw,3.5rem)]"
         >
           <WorksContent />
         </div>
@@ -552,7 +568,8 @@ function DesktopExperience({ low }: { low: boolean }) {
         <div
           data-cursor="glass"
           data-scene="dark"
-          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,32rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
+          data-center="y"
+          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,32rem)] p-[clamp(2rem,3.5vw,3rem)]"
         >
           <ContactContent />
         </div>
@@ -578,11 +595,16 @@ function DesktopExperience({ low }: { low: boolean }) {
           fetchPriority="high"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="preloader-content absolute inset-0 flex flex-col items-center justify-center gap-10 opacity-0 [text-shadow:0_1px_3px_rgba(0,0,0,0.45),0_2px_16px_rgba(0,0,0,0.3)]">
-          <span className="display text-hero text-center uppercase leading-[0.95]">
-            <span className="block">Forma</span>
-            <span className="block">Studio</span>
-          </span>
+        <div className="preloader-content absolute inset-0 flex flex-col items-center justify-center gap-8 opacity-0">
+          {/* The same glass lockup as panel 1, so the name is legible over
+              any part of the still and the fade-out lands on an identical
+              panel — the buffering rule is the only thing that leaves. */}
+          <div
+            data-scene="light"
+            className="glass w-[min(94vw,64rem)] px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
+          >
+            <NameContent heading={false} />
+          </div>
           {/* Buffering progress — a thin rule that fills as the video loads */}
           <span className="block h-px w-44 bg-white/25">
             <span className="preloader-fill block h-full w-full origin-left scale-x-0 bg-white" />
