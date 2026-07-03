@@ -36,8 +36,15 @@ rather than to anchors, since the document is one pinned track.
 
 ## Design system
 
-Three colours only. The frosted glass panels (blur + hairline border +
-soft inner glow) are the one sanctioned exception to the no-shadow rule.
+Three colours only. The glass panels are Apple-style material —
+`blur(20px) saturate(180%)`, hairline `rgba(255,255,255,0.15)` border,
+inset-only shadows — and adapt to the video behind them: white glass
+(`rgba(255,255,255,0.08)`) over dark scenes, dark glass
+(`rgba(0,0,0,0.25)`) over light ones. Brightness is sampled from the
+video frame under the active panel (tiny canvas, luminance average,
+hysteresis at 0.36/0.42 so mid-tones never flicker) — the flip point is
+where white text would stop passing WCAG AA. All panel text carries a
+soft text-shadow for legibility on any frame.
 
 | Token             | Value     | Use                        |
 | ----------------- | --------- | -------------------------- |

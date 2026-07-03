@@ -51,6 +51,7 @@ export function Experience() {
     if (!section || !video) return;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let removeVideoListeners = () => {};
 
     const ctx = gsap.context(() => {
       const panels = gsap.utils.toArray<HTMLElement>(".panel");
@@ -144,6 +145,69 @@ export function Experience() {
       let active = -1;
       let hintGone = false;
 
+      /* Adaptive glass: sample the video's brightness behind the active
+         panel and flip its tint — white glass over dark scenes, dark glass
+         over light ones. The frame is drawn into a tiny canvas and only the
+         region under the panel (mapped through object-cover) is averaged.
+         Thresholds have hysteresis so mid-tone frames never flicker. */
+      const sceneCanvas = document.createElement("canvas");
+      sceneCanvas.width = 96;
+      sceneCanvas.height = 54;
+      const sceneCtx = sceneCanvas.getContext("2d", {
+        willReadFrequently: true,
+      });
+      let lastSample = 0;
+
+      const sampleScene = (panel: HTMLElement) => {
+        if (!sceneCtx || video.readyState < 2 || !video.videoWidth) return;
+        try {
+          sceneCtx.drawImage(video, 0, 0, sceneCanvas.width, sceneCanvas.height);
+        } catch {
+          return;
+        }
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const scale = Math.max(vw / video.videoWidth, vh / video.videoHeight);
+        const dispW = video.videoWidth * scale;
+        const dispH = video.videoHeight * scale;
+        const offX = (dispW - vw) / 2;
+        const offY = (dispH - vh) / 2;
+        const rect = panel.getBoundingClientRect();
+        const sx = Math.max(0, Math.floor(((rect.left + offX) / dispW) * sceneCanvas.width));
+        const sy = Math.max(0, Math.floor(((rect.top + offY) / dispH) * sceneCanvas.height));
+        const ex = Math.min(sceneCanvas.width, Math.ceil(((rect.right + offX) / dispW) * sceneCanvas.width));
+        const ey = Math.min(sceneCanvas.height, Math.ceil(((rect.bottom + offY) / dispH) * sceneCanvas.height));
+        if (ex - sx < 1 || ey - sy < 1) return;
+        const data = sceneCtx.getImageData(sx, sy, ex - sx, ey - sy).data;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        }
+        const lum = sum / (data.length / 4) / 255;
+        /* White glass brightens the backdrop, so white text stops passing
+           WCAG AA (4.5:1) once the scene behind exceeds ~0.40 luminance —
+           that's the flip point, with hysteresis against flicker. */
+        const scene = panel.dataset.scene;
+        if (scene === "light" ? lum < 0.36 : lum > 0.42) {
+          panel.dataset.scene = scene === "light" ? "dark" : "light";
+        }
+      };
+
+      const sampleActive = (force = false) => {
+        const now = performance.now();
+        if (!force && now - lastSample < 180) return;
+        lastSample = now;
+        if (active !== -1) sampleScene(panels[active]);
+      };
+
+      const onFrame = () => sampleActive();
+      video.addEventListener("seeked", onFrame);
+      video.addEventListener("loadeddata", onFrame);
+      removeVideoListeners = () => {
+        video.removeEventListener("seeked", onFrame);
+        video.removeEventListener("loadeddata", onFrame);
+      };
+
       const update = (p: number) => {
         seek(p);
         if (fill) gsap.set(fill, { scaleY: p });
@@ -167,6 +231,9 @@ export function Experience() {
           if (active !== -1) hide(active);
           if (idx !== -1) show(idx);
           active = idx;
+          sampleActive(true);
+        } else {
+          sampleActive();
         }
       };
 
@@ -182,7 +249,10 @@ export function Experience() {
       update(st.progress);
     }, root);
 
-    return () => ctx.revert();
+    return () => {
+      removeVideoListeners();
+      ctx.revert();
+    };
   }, []);
 
   return (
@@ -212,10 +282,14 @@ export function Experience() {
         {/* 1 — exterior: studio name */}
         <div
           data-cursor="glass"
-          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(92vw,52rem)] -translate-x-1/2 -translate-y-1/2 px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
+          data-scene="dark"
+          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,64rem)] -translate-x-1/2 -translate-y-1/2 px-[clamp(2rem,6vw,5rem)] py-[clamp(2.5rem,6vw,4.5rem)] text-center"
         >
-          <h1 className="display text-display uppercase">Forma Studio</h1>
-          <p className="label mt-6 text-white/70">
+          <h1 className="display text-hero uppercase leading-[0.95]">
+            <span className="block">Forma</span>
+            <span className="block">Studio</span>
+          </h1>
+          <p className="label mt-8 text-white/95">
             Architecture &amp; Interior Design — Est. 1998
           </p>
         </div>
@@ -223,11 +297,12 @@ export function Experience() {
         {/* 2 — entrance: philosophy */}
         <div
           data-cursor="glass"
-          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(88vw,26rem)] -translate-y-1/2 p-[clamp(1.75rem,3vw,2.5rem)]"
+          data-scene="dark"
+          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,34rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
-          <h2 className="display text-heading">We design spaces that endure.</h2>
-          <span className="draw-line mt-4 block h-px w-full scale-x-0 bg-white/70" />
-          <p className="mt-6 text-sm leading-relaxed text-white/80">
+          <h2 className="display text-title">We design spaces that endure.</h2>
+          <span className="draw-line mt-5 block h-px w-full scale-x-0 bg-white/80" />
+          <p className="mt-6 max-w-[38ch] text-base leading-relaxed text-white/95">
             Forma works at the meeting point of architecture and interior — one
             continuous discipline, not two. We build slowly, precisely, and only
             what deserves to remain.
@@ -237,13 +312,14 @@ export function Experience() {
         {/* 3 — threshold: stats */}
         <div
           data-cursor="glass"
-          className="panel glass pointer-events-auto absolute right-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(80vw,19rem)] -translate-y-1/2 p-[clamp(1.75rem,3vw,2.5rem)]"
+          data-scene="dark"
+          className="panel glass pointer-events-auto absolute right-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(84vw,22rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
           <div className="flex flex-col gap-8">
             {STATS.map((stat) => (
               <div key={stat.label}>
-                <span className="label block text-concrete">{stat.label}</span>
-                <span className="display mt-1 block text-title tabular-nums">
+                <span className="label block text-white/95">{stat.label}</span>
+                <span className="display mt-1 block text-display tabular-nums">
                   <span className="stat-num" data-target={stat.value}>
                     0
                   </span>
@@ -256,27 +332,28 @@ export function Experience() {
         {/* 4 — living space: selected works */}
         <div
           data-cursor="glass"
-          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(92vw,44rem)] -translate-x-1/2 -translate-y-1/2 p-[clamp(1.75rem,4vw,3rem)]"
+          data-scene="dark"
+          className="panel glass pointer-events-auto absolute left-1/2 top-1/2 w-[min(94vw,54rem)] -translate-x-1/2 -translate-y-1/2 p-[clamp(2rem,4vw,3.5rem)]"
         >
-          <h2 className="display text-title uppercase">Selected Works</h2>
+          <h2 className="display text-display uppercase">Selected Works</h2>
           <ul className="mt-8">
             {WORKS.map((work) => (
               <li
                 key={work.name}
-                className="flex items-baseline justify-between gap-6 border-t border-white/12 py-4"
+                className="flex items-baseline justify-between gap-6 border-t border-white/15 py-4"
               >
                 <span className="display text-heading">{work.name}</span>
-                <span className="label ml-auto text-concrete">
+                <span className="label ml-auto text-white/95">
                   {work.category}
                 </span>
-                <span className="label text-white/70">{work.year}</span>
+                <span className="label text-white/95">{work.year}</span>
               </li>
             ))}
           </ul>
           <a
             href="mailto:studio@formastudio.example?subject=Portfolio%20request"
             data-cursor="cta"
-            className="label mt-8 inline-block text-white/70 transition-opacity duration-300 hover:opacity-60 [letter-spacing:0.18em]"
+            className="label mt-8 inline-block text-white/95 transition-opacity duration-300 hover:opacity-60 [letter-spacing:0.18em]"
           >
             View All
           </a>
@@ -285,12 +362,13 @@ export function Experience() {
         {/* 5 — toward the window: contact */}
         <div
           data-cursor="glass"
-          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,27rem)] -translate-y-1/2 p-[clamp(1.75rem,3vw,2.5rem)]"
+          data-scene="dark"
+          className="panel glass pointer-events-auto absolute left-[clamp(1.25rem,4vw,4rem)] top-1/2 w-[min(90vw,32rem)] -translate-y-1/2 p-[clamp(2rem,3.5vw,3rem)]"
         >
-          <h2 className="display text-heading">Start a project.</h2>
+          <h2 className="display text-title">Start a project.</h2>
 
           {inquiry.status === "sent" ? (
-            <p className="mt-8 text-sm text-white/80">{inquiry.message}</p>
+            <p className="mt-8 text-base text-white/95">{inquiry.message}</p>
           ) : (
             <form action={formAction} className="mt-8">
               <div className="flex items-end gap-4">
@@ -300,7 +378,7 @@ export function Experience() {
                   required
                   placeholder="Your email"
                   aria-label="Your email"
-                  className="w-full border-0 border-b border-white/30 bg-transparent py-2 text-sm text-white outline-none transition-colors duration-300 placeholder:text-concrete focus:border-white/70"
+                  className="w-full border-0 border-b border-white/40 bg-transparent py-2 text-base text-white outline-none transition-colors duration-300 placeholder:text-white/75 focus:border-white/80"
                 />
                 <button
                   type="submit"
@@ -312,12 +390,12 @@ export function Experience() {
                 </button>
               </div>
               {inquiry.status === "error" && (
-                <p className="mt-3 text-xs text-white/60">{inquiry.message}</p>
+                <p className="mt-3 text-sm text-white/95">{inquiry.message}</p>
               )}
             </form>
           )}
 
-          <div className="mt-10 text-sm text-white/60">
+          <div className="mt-10 text-base text-white/95">
             <a
               href="mailto:studio@formastudio.example"
               data-cursor="cta"
